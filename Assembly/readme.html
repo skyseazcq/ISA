@@ -1,0 +1,664 @@
+<html>
+<head>
+<title>Assembler Framework</title>
+</head>
+<body>
+<h2>Assembler framework</h2>
+The core of the assembler framework is an abstract class 
+"<a href="#Assembler">Assembler</a>". You can download the Assembler class
+<a
+href="http://www.cs.ucsd.edu/classes/sp09/cse141/Media/Assembler.tar.gz">here</a>. 
+You may develop your own assembler by
+creating a new class that inherits the Assembler class and realize the abstract 
+methods of the Assembler class. The AssembleCode method in the Assembler
+class contains a process that will help you parse the code and generate the
+machine code. The current Assembler class supports the following features:
+
+<h3>Features</h3>
+Take a look of the following sample assembly code written in the old
+FlexGermanica ISA:
+<pre>
+.text
+        la  $1, table0    // load the address of a label table0 (pseudo instruction)
+        lw  $2, $1        // $2 &lt;= 0x000C0FFEE
+        lw  $3, table0    // load the value at label table0 (pseudo instruction), $3 &lt;= 0x000C0FFEE
+        lw  $4, 3(table0) // $4 &lt;= table1
+        lw  $5, 1($4)     // $5 &lt;= 0x1DEADBEEF
+        sw  $5, 1($1)     // 0x001COFFEE is overwritten to 0x1DEADBEEF
+        li  $6, 0xC0FFEE  // load immediate (pseudo instruction), $6 &lt;= 0xC0FFEE
+
+.data
+   table0:
+        .word 0x000C0FFEE
+        .word 0x001C0FFEE
+        .word 0x002C0FFEE
+        .word table1
+   table1:
+        .word 0x0DEADBEEF
+        .word 0x1DEADBEEF
+        .word 0x2DEADBEEF
+        .word 0x3DEADBEEF
+        .word 0x0DEADBEEF, 0x1DEADBEEF, 0x2DEADBEEF
+        .fill 10 0x0
+
+</pre>
+<ul>
+<p>
+<li><h4>keywords</h4>
+The assembler framework currently supports the following keywords and 
+reserved words used in the example code above. Of course, to make your new
+design more attractive, you may extend it with other keywords by override
+the default <a href="#keywords">keywords</a> String array while implementing
+the <a href="#initialization">initialization</a> method.
+</p>
+<ul>
+ <li> <b><i>.text</i></b></li>
+ <p>Indicates the start of the text section, consisting of instructions. 
+ <i>.text</i> can appear many times in an assembly file, but they must be 
+ merged into a single section in the output of the assembler. </p>
+
+ <li><b><i>.data</i></b></li>
+ <p>Indicates the start of the data section. Similar to <i>.text</i>, there 
+ can be multiple <i>.data</i> in an assembly file. </p>
+
+ <p><li> <b><i>.word</i></b></li></p>
+ <p>Specifies the word data at a memory location. It can be followed by 
+ multiple one or more words to describe data for multiple words.</p>
+
+ <p><li> <b><i>.fill</i></b></li></p>
+ <p>Duplicates a data many times. For example, <i>.fill 10 0x0</i> duplicates 
+ 0x0 ten times.</p>
+
+</ul>
+</li>
+<li>
+ <p><h4>label:</h4></p>
+ <p>Represents an instruction or data memory address, similar to labels in 
+ other languages, can be used in instructions to specify a specific address 
+ (e.g. la $0, table0). When you use labels, you can minimize the amount of 
+ manual modifications in your assembly code upon insertions or deletions of 
+ instructions and/or data. For example, suppose that <i>.word 0x003COFFEE</i> 
+ is insterted after <i>.word 0x002C0FFEE</i> in the previous sample code; 
+ the only needed change is the fourth instruction from <i>lw $4, 3(table0)
+ </i> to <i>lw $4, 4(table)</i>. In other words, labels make the code 
+ maintenance cost more manageable by keeping the effect of a code modification 
+ be local to a label.</p>
+</li>
+<li>
+ <p><h4>comment</h4></p>
+ <p>The assembly code is very hard to be understood. To prevent the
+ programmers from forgetting why they write these code, the assembler
+ framework also allows the programmers to append some comments. All comment
+ must be started with "//". In other words, all the contents after "//" will
+ not be processed by the assembler framework. 
+ </p>
+</li>
+<li><h4>Instruction Format</h4>
+<p>The assembler framework can recognize instructions with the form of
+operator + operands. The assembler framework also supports the following 
+operand formats as appeared in the previous example code.
+</p>
+<ul>
+ <p><li><b><i> lw $rd, offset($rs)</i></b></li></p>
+  <p> The operand is composed of a register and offset.</p>
+
+ <p><li><b><i> lw $rd, offset(label)</i></b></li></p>
+  <p> The operand is composed of label and offset.</p>
+
+ <p><li><b><i> lw $rd, label</i></b></li></p>
+  <p> The operand is a label.</p>
+
+ <p><li><b><i> lw $rd, $rs</i></b></li></p>
+  <p> The operand is a register.</p>
+
+ <p><li><b><i> li $rd, immediate</i></b></li></p>
+  <p> The operand is an immediate value.</p>
+</ul>
+<p>In addition, the assembler framework does not limit the number of operands that an
+instruction can have. 
+</p>
+</li>
+<li><h4>Tips</h4>
+<p>
+The simplest way to build your own assembler on top of the assembler
+framewrok is to create a class that extends the <a href="#Assembler">Assembler</a> 
+class and realize the abstract methods in the class. These methods include
+processLabel, generateCode, updateProgramCounter, initialization,
+replaceInstructionLabel, and replaceMemoryLabel. </p>
+<p>
+The AssembleCode method
+in the <a href="#Assembler">Assembler</a> class can help you generate the
+machine code. Therefore, you may write a main method in your assembler class
+as:
+<pre>
+    public static void main(String[] arg) throws IOException
+    {
+        asm assembler = new asm(arg);
+        assembler.AssembleCode(arg); 
+    }
+</pre>
+The rest of this document describes all the classes in the assembler
+framwork in detail.
+</p>
+</li>
+</ul>
+</ul>
+<a name="AssemblerDocs"></a>
+<h3>Detail Description of Classes</h3>
+<p>
+In the following paragraphs, we will provide a detail description of classes
+in our assembler framework. We will first start by the 
+<a href="#Assembler">Assembler</a> class, which is the core of assembler
+framework. The assembler framework also has an <a
+href="#Instruction">Instruction</a> class, <a href="#Operand">Operand</a> 
+class, a <a href="#Memory">Memory</a> class, and a <a
+href="#MemoryEntry">MemoryEntry</a> class to help the Assembler class
+complete the assemler functions. In the following paragraphs, we will
+describe these classes in detail. 
+<a name="Assembler"></a>
+<h3>Assembler Class</h3>
+The Assembler class has the following fields: 
+</p>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0">
+<TR BGCOLOR="#CCCCFF">
+<TD COLSPAN="2"><B>Field Summary</B></TD></TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public BufferedReader</nobr></FONT></TD>
+<TD><B>sourceFile</B><BR></BR>
+The file reader of the input source file. You need to intialize it before
+processing the source code.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public BufferedWriter</nobr></FONT></TD>
+<TD><B>out_code</B>
+<BR></BR>
+The file writer for machine code output (*_i.coe). You need to initialize it
+before generating any code output. 
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public BufferedWriter</nobr></FONT></TD>
+<TD><B>out_data</B>
+<BR></BR>
+The file writer for data code output (*_d.coe). You need to initialize it
+before generating any data output. 
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public String[]</nobr></FONT></TD>
+<TD><B><a name="keywords"></a>
+keywords</B>
+<BR></BR>
+The array stores the keywords used by the Assembler. You may override it in
+your class to extend the assembly language with more keywords. 
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public <a href="#Instruction">Instruction</a> </nobr></FONT></TD>
+<TD><B>instructions</B><BR></BR>
+An array of Instruction objects that stores the parsed instructions.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public <a href="#Memory">Memory</a> </nobr></FONT></TD>
+<TD><B>memory</B><BR></BR>
+The object stores the parsed data words. 
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public int</nobr></FONT></TD>
+<TD><B>instructionCount</B><BR></BR>
+The number of scanned instructions.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public int</nobr></FONT></TD>
+<TD><B>currentCodeSection</B><BR></BR>
+The current code section. By default, 0 stands for text section, and 1 for
+data section.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public int</nobr></FONT></TD>
+<TD><a name="programCounter"></a><B>programCounter</B><BR></BR>
+The current program counter. You may need it while processing labels. 
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public int</nobr></FONT></TD>
+<TD><B>dataMemoryAddress</B><BR></BR>
+The current data memory address. You may need it while processing labels. 
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public int</nobr></FONT></TD>
+<TD><B>currentSourceCodeline</B><BR></BR>
+How many source code lines has been scanned. You may not need it since the
+framework only uses for generating error messages. 
+</TD>
+</TR>
+</TABLE>
+
+<p>The Assembler class has two different constructors: </p>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0">
+<TR BGCOLOR="#CCCCFF">
+<TD><B>Constructor Summary</B></TD></TR>
+<TR BGCOLOR="white">
+<TD><B>Assembler()</B><BR></BR>
+Construct an Assembler object without any initialization. 
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD><B>Assembler(String[] args)</B>
+<BR></BR>
+Construct an Assembler object with the file I/O handlers initialized.
+</TD>
+</TR>
+</TABLE>
+
+<p>
+The Assembler class has following methods:
+</p>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0">
+<TR BGCOLOR="#CCCCFF">
+<TD COLSPAN="2"><B>Method Summary</B></TD></TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public String</nobr></FONT></TD>
+<TD><B>getNextInputLine()</B><BR></BR>
+Get the next non-comment or non-empty line from the source code file, and
+return the scanned line with a String. All contents after "//" will be
+ignored and will not be contained in the returned String. Once the source 
+code reaches an EOF, the method will return a "null".
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>boolean</nobr></FONT></TD>
+<TD><B>isKeyword(String sourceCodeLine)</B><BR></BR>
+Examine if the input line from source code contains a keyword.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>String</nobr></FONT></TD>
+<TD><B>extractKeyword(String sourceCodeLine)</B><BR></BR>
+Extract the keyword from the input string.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>boolean</nobr></FONT></TD>
+<TD><B>isLabel(String sourceCode)</B><BR></BR>
+Examine if the input line from source code contains a label.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>String</nobr></FONT></TD>
+<TD><B>extractLabel(String sourceCodeLine)</B><BR></BR>
+Extract the label from the input string.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr><a href="#Instruction">Instruction</a> </nobr></FONT></TD>
+<TD><B>processInstruction(String sourceCode)</B><BR></BR>
+Parse the input source code into an Instruction object.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>void</nobr></FONT></TD>
+<TD><B>processData(String sourceCode)</B><BR></BR>
+Parse the source code from the data section into the memory object of
+Assembler. 
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public static String</nobr></FONT></TD>
+<TD><B>getOperandType(String operand)</B><BR></BR>
+Examine if the input operand string is a meaningful term.  The returned
+String will be "register" if the operand starts with "$". The returned
+String will be "immediate" if the operand starts with "0x". The returned
+String will be "label" if the operand cannot be categorize into the last two
+categories.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public void</nobr></FONT></TD>
+<TD><B>outputErrorMessage(String errorMessage)</B><BR></BR>
+Output the error message and show the incorrect source code line.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public void</nobr></FONT></TD>
+<TD><B><a name="AssembleCode"></a>AssembleCode(String arg[])</B><BR></BR>
+The most important method in Assembler class. This function controls the
+flow of Assembler. You may not need to change it. However, you may also
+override it if you have a better algorithm than our current two-parse
+algorithm. 
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>void</nobr></FONT></TD>
+<TD><B>processAdditionalKeywords(String sourceCode)</B><BR></BR>
+You may override to process additional keywords. 
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>abstract void</nobr></FONT></TD>
+<TD><B>processLabel(String sourceCode)</B><BR></BR>
+You have to implement it to process the labels. You may also need to
+implement a symbol table to maintain the labels and their real addresses. 
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>abstract void</nobr></FONT></TD>
+<TD><B>replaceInstructionLabel(Instruction instruction)</B><BR></BR>
+Replace the operands in the form of labels with immediate values. The method
+will be called before generating the machine code for an instruction in the
+<a href="#AssembleCode">AssembleCode</a> method.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>abstract String</nobr></FONT></TD>
+<TD><B>generateCode(Instruction instruction)</B><BR></BR>
+You have to implement it for generating the machine code from an Instruction
+object. 
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>abstract void</nobr></FONT></TD>
+<TD><B>updateProgramCounter(Instruction instruction)</B><BR></BR>
+You have to implement it for updating the <a
+href="#programCounter">programCounter</a>. If your algorithm does not require
+the variable, you may implement it as an empty method.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>abstract void</nobr></FONT></TD>
+<TD><B><a name="initialization">initialization()</a></B><BR></BR>
+The method is called before the source code is scanned or generated. You have 
+to implement it to initialize some variables, such as file descriptors or
+local variables, in your class.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>abstract void</nobr></FONT></TD>
+<TD><B>replaceMemoryLabel()</B><BR></BR>
+The method is called before the data memory is dumped to a $prefix_d.coe
+file. It will replace the data written in labels with immediate values.
+</TD>
+</TR>
+</TABLE>
+
+<a name="Instruction"></a>
+<h3>Instruction Class</h3>
+<p>
+For each instruction in the text section, the assembler framework will parse
+them into an array of Instruction objects. The Instruction class has the
+following fields: 
+</p>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0">
+<TR BGCOLOR="#CCCCFF">
+<TD COLSPAN="2"><B>Field Summary</B></TD></TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public String</nobr></FONT></TD>
+<TD><B>operator</B><BR></BR>
+A string stores the operator of the instruction. Take the code sw  $5, 1($1)
+as an example, the operator will be the string "sw".
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public <a href="#Operand">Operand</a></nobr></FONT></TD>
+<TD><B>operands</B>
+<BR></BR>
+An array of Operand objects stores the arguments of the instruction. 
+</TD>
+</TR>
+</TABLE>
+<p>The Instruction class has two different constructors: </p>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0">
+<TR BGCOLOR="#CCCCFF">
+<TD><B>Constructor Summary</B></TD></TR>
+<TR BGCOLOR="white">
+<TD><B>Instruction(String sourceCodeLine)</B><BR></BR>
+Construct an Instruction object using the scanned source code. 
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD><B>Instruction(String operator, Operand operands[])</B>
+<BR></BR>
+Construct an Instruction object using the assigned operator and operands.
+</TD>
+</TR>
+</TABLE>
+<p>
+The Instruction class has following methods:
+</p>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0">
+<TR BGCOLOR="#CCCCFF">
+<TD COLSPAN="2"><B>Method Summary</B></TD></TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public void</nobr></FONT></TD>
+<TD><B>print()</B><BR></BR>
+Print the operartor and operands of the current Instruction object. 
+</TD>
+</TR>
+</TABLE>
+
+<a name="Operand"></a>
+<h3>Operand Class</h3>
+<p>
+The Operand class has the following fields: 
+</p>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0">
+<TR BGCOLOR="#CCCCFF">
+<TD COLSPAN="2"><B>Field Summary</B></TD></TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public String</nobr></FONT></TD>
+<TD><B>name</B><BR></BR>
+A string stores the name of a operand.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public int</nobr></FONT></TD>
+<TD><B>offset</B>
+<BR></BR>
+A offset of this operand.
+</TD>
+</TR>
+</TABLE>
+<p>The Operand class has two different constructors: </p>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0">
+<TR BGCOLOR="#CCCCFF">
+<TD><B>Constructor Summary</B></TD></TR>
+<TR BGCOLOR="white">
+<TD><B>Operand()</B><BR></BR>
+Construct an Operand object with their name initialized as "", and offset
+initialized as 0
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD><B>Operand(String i_name, int i_offset)</B>
+<BR></BR>
+Construct an Operand object with their name initialized as i_name, and offset
+initialized as i_offset
+</TD>
+</TR>
+</TABLE>
+<p>
+The Operand class has the following method:
+</p>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0">
+<TR BGCOLOR="#CCCCFF">
+<TD COLSPAN="2"><B>Method Summary</B></TD></TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public String</nobr></FONT></TD>
+<TD><B>getOperandType(String operand)</B><BR></BR>
+Examine if the input operand string is a meaningful term. The returned
+String will be "register" if the operand starts with "$". The returned
+String will be "immediate" if the operand starts with "0x". The returned
+String will be "label" if the operand cannot be categorize into the last two
+categories.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public int</nobr></FONT></TD>
+<TD><B>extractRegisterNumber()</B><BR></BR>
+If the operand is a register, this method will return an integer value of
+the register number. Otherwise, the method will return -1.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public long</nobr></FONT></TD>
+<TD><B>extractImmediate()</B><BR></BR>
+If the operand is an immediate value, this method will return an integer 
+value of the immediate value. Otherwise, the method will return
+Integer.MIN_VALUE.
+</TD>
+</TR>
+</TABLE>
+
+<a name="Memory"></a>
+<h3>Memory Class</h3>
+<p>
+The Memory class has the following fields: 
+</p>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0">
+<TR BGCOLOR="#CCCCFF">
+<TD COLSPAN="2"><B>Field Summary</B></TD></TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>int</nobr></FONT></TD>
+<TD><B>size</B><BR></BR>
+Number of elements in the Memory class object.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public <a href="#MemoryEntry">MemoryEntry[]</a></nobr></FONT></TD>
+<TD><B>entries</B>
+<BR></BR>
+An array stores the data in the memory.
+</TD>
+</TR>
+</TABLE>
+
+<p>The Memory class has two different constructors: </p>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0">
+<TR BGCOLOR="#CCCCFF">
+<TD><B>Constructor Summary</B></TD></TR>
+<TR BGCOLOR="white">
+<TD><B>Memory()</B><BR></BR>
+Construct an Memory object with the number of entries initialized to 1024. 
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD><B>Memory(int n)</B>
+<BR></BR>
+Construct an Memory object with the number of entries initialized to n. 
+</TD>
+</TR>
+</TABLE>
+<p>
+The Memory class has the following method:
+</p>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0">
+<TR BGCOLOR="#CCCCFF">
+<TD COLSPAN="2"><B>Method Summary</B></TD></TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public void</nobr></FONT></TD>
+<TD><B>add(String data,int address)</B><BR></BR>
+Add the data into the Memory object and bookkeeping its data memory address.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public void</nobr></FONT></TD>
+<TD><B>find(int address)</B><BR></BR>
+Find the data stored in input address.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public void</nobr></FONT></TD>
+<TD><B>print()</B><BR></BR>
+Print the content of current Memory object.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public void</nobr></FONT></TD>
+<TD><B>dump()</B><BR></BR>
+Dump the content of current Memory object as the form of 34-bit machine
+code.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>public int</nobr></FONT></TD>
+<TD><B>leng()</B><BR></BR>
+Return the size of current entries.
+</TD>
+</TR>
+</TABLE>
+<a name="MemoryEntry"></a>
+<h3>MemoryEntry Class</h3>
+<p>
+The MemoryEntry class has the following fields: 
+</p>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0">
+<TR BGCOLOR="#CCCCFF">
+<TD COLSPAN="2"><B>Field Summary</B></TD></TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>String</nobr></FONT></TD>
+<TD><B>data</B><BR></BR>
+A string stores the data word in an memory entry.
+</TD>
+</TR>
+<TR BGCOLOR="white">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<nobr>int</nobr></FONT></TD>
+<TD><B>address</B>
+<BR></BR>
+The data memory address of the object.
+</TD>
+</TR>
+</TABLE>
+
+</body>
+</html>
